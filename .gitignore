@@ -1,0 +1,40 @@
+# Ansible
+*.retry
+*.pyc
+__pycache__/
+.ansible/
+
+# Vault files
+**/vault.yml
+**/secrets.yml
+*.vault
+
+# Private keys and certificates
+*.pem
+*.key
+*.crt
+*.csr
+*.cer
+
+# Environment variables
+.env
+.env.*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Ansible inventories
+/inventories/*
+!/inventories/inventory.example.yml

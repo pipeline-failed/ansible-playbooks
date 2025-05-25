@@ -1,0 +1,18 @@
+all:
+  hosts:
+    my_server:
+      ansible_host: 192.168.1.1  
+      ansible_user: ubuntu        
+      ansible_password: secretpassword  
+      ansible_sudo_pass: sudopassword   
+      # ansible_ssh_private_key_file: ~/.ssh/id_rsa  
+
+  
+  children:
+    docker_servers:
+      hosts:
+        my_server:
+    
+    staging:
+      hosts:
+        my_server:
