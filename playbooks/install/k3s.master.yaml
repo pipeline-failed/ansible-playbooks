@@ -14,22 +14,11 @@
       shell: |
         curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -
 
-    - name: Display K3s info
-      shell: |
-        k3s kubectl get nodes && sudo systemctl status k3s
-
     - name: Install Nginx Ingress Controller
       shell: |
         kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
 
-    - name: Display Nginx Ingress Controller info
-      shell: |
-        kubectl get pods -n ingress-nginx
 
     - name: Install Cert Manager
       shell: |
         kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.3/cert-manager.yaml 
-
-    - name: Display Cert Manager info
-      shell: |
-        kubectl get pods -n cert-manager

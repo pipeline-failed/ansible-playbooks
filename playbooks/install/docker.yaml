@@ -79,6 +79,3 @@
         name: "{{ ansible_user }}"
         groups: docker
         append: yes
-
-    - name: Display Docker info
-      command: docker info
