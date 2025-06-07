@@ -8,3 +8,10 @@ docker_secret_name:
 # Env secret
 env_secret_name:
 env_secret_file: .env
+
+# Argo CD repository secret
+repo_secret_name:
+namespace:
+repo_url:
+repo_username:
+repo_token:
