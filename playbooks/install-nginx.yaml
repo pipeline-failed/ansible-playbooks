@@ -4,6 +4,13 @@
   become: true       
 
   tasks:
+    - name: Update apt cache and upgrade packages
+      apt:
+        update_cache: yes
+        upgrade: yes
+        cache_valid_time: 3600
+        force_apt_get: yes
+
     - name: Install NGINX package
       apt:
         name: nginx
@@ -20,7 +27,6 @@
         update_cache: yes
       when: ansible_os_family == "Debian"
 
-    
     - name: Start NGINX service
       service:
         name: nginx
