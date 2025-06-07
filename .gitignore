@@ -36,8 +36,12 @@ ehthumbs.db
 Thumbs.db
 
 # Ansible inventories
-/inventories/*
-!/inventories/inventory.example.yml
+/inventories/inventory.yml
+/inventories/group_vars/all.yml
 
 # Vagrant
 .vagrant/
+
+
+# group_vars
+group_vars/all.yml
