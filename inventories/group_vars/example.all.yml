@@ -1,5 +1,10 @@
+# Docker registry
 docker_registry_server: 
 docker_registry_username: 
 docker_registry_password:
 docker_registry_email: 
 docker_secret_name: 
+
+# Env secret
+env_secret_name:
+env_secret_file: .env
