@@ -38,3 +38,6 @@ Thumbs.db
 # Ansible inventories
 /inventories/*
 !/inventories/inventory.example.yml
+
+# Vagrant
+.vagrant/

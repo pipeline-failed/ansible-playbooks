@@ -1,0 +1,25 @@
+---
+- name: Install and configure NGINX
+  hosts: all  
+  become: true       
+
+  tasks:
+    - name: Install NGINX package
+      apt:
+        name: nginx
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"  
+    
+    - name: Start NGINX service
+      service:
+        name: nginx
+        state: started
+        enabled: yes
+    
+
+  handlers:
+    - name: Restart NGINX
+      service:
+        name: nginx
+        state: restarted
