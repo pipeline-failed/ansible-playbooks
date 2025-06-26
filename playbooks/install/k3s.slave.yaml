@@ -1,0 +1,15 @@
+- name: Install K3s Slave Node
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Update apt cache and upgrade packages
+      apt:
+        update_cache: yes
+        upgrade: yes
+        cache_valid_time: 3600
+        force_apt_get: yes
+
+    - name: Install K3s
+      shell: |
+        curl -sfL https://get.k3s.io | K3S_URL=https://{{ k3s_master_ip }}:6443 K3S_TOKEN={{ k3s_master_token }} sh -
