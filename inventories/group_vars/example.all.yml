@@ -15,3 +15,7 @@ namespace:
 repo_url:
 repo_username:
 repo_token:
+
+# k3s slave node
+k3s_master_token: 
+k3s_master_ip: 
