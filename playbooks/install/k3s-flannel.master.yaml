@@ -12,7 +12,14 @@
 
     - name: Install K3s
       shell: |
-        curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -
+        curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server --cluster-init --disable traefik " sh -
+
+    - name: Set Kubeconfig
+      shell: |
+        mkdir -p ~/.kube
+        cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+        chown $(id -u):$(id -g) ~/.kube/config
+        export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
     - name: Install Nginx Ingress Controller
       shell: |
