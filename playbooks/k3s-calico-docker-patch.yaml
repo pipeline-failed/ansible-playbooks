@@ -1,0 +1,76 @@
+---
+- name: Patch K3s Calico cluster with Docker registry
+  hosts: all
+  become: true
+
+  vars:
+    docker_secret_name: "{{ docker_secret_name | default('docker-registry-secret') }}"
+    docker_registry: "{{ docker_registry | default('registry.example.com') }}"
+    docker_username: "{{ docker_username | default('username') }}"
+    docker_password: "{{ docker_password | default('password') }}"
+    docker_email: "{{ docker_email | default('user@example.com') }}"
+
+  tasks:
+    - name: Check if K3s is running
+      shell: systemctl is-active k3s
+      register: k3s_status
+      ignore_errors: true
+
+    - name: Fail if K3s is not running
+      fail:
+        msg: "K3s service is not running. Please install K3s first."
+      when: k3s_status.rc != 0
+
+    - name: Set Kubeconfig
+      shell: |
+        mkdir -p ~/.kube
+        cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+        chown $(id -u):$(id -g) ~/.kube/config
+        export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+    - name: Check if Calico is installed
+      shell: kubectl get namespace calico-system
+      register: calico_namespace
+      ignore_errors: true
+
+    - name: Fail if Calico namespace doesn't exist
+      fail:
+        msg: "Calico namespace not found. Please install Calico first."
+      when: calico_namespace.rc != 0
+
+    - name: Create Docker Registry Secret in calico-system namespace
+      shell: |
+        kubectl create secret docker-registry {{ docker_secret_name }} \
+          --docker-server={{ docker_registry }} \
+          --docker-username={{ docker_username }} \
+          --docker-password={{ docker_password }} \
+          --docker-email={{ docker_email }} \
+          --namespace=calico-system
+      ignore_errors: true
+
+    - name: Patch csi-node-driver ServiceAccount with image pull secret
+      shell: |
+        kubectl patch serviceaccount csi-node-driver -n calico-system -p '{"imagePullSecrets": [{"name": "{{ docker_secret_name }}"}]}'
+      ignore_errors: true
+
+    - name: Patch csi-node-driver DaemonSet with image pull secret
+      shell: |
+        kubectl patch daemonset csi-node-driver -n calico-system -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"{{ docker_secret_name }}"}]}}}}'
+      ignore_errors: true
+
+    - name: Restart csi-node-driver DaemonSet
+      shell: |
+        kubectl rollout restart daemonset csi-node-driver -n calico-system
+      ignore_errors: true
+
+    - name: Wait for csi-node-driver pods to be ready after restart
+      shell: |
+        kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=csi-node-driver -n calico-system --timeout=300s
+      ignore_errors: true
+
+    - name: Display final status
+      shell: |
+        echo "=== Final Status ==="
+        kubectl get pods -n calico-system
+        echo "=== Docker Secret Status ==="
+        kubectl get secret {{ docker_secret_name }} -n calico-system
