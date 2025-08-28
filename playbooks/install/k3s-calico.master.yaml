@@ -42,15 +42,38 @@
         chown $(id -u):$(id -g) ~/.kube/config
         export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
-    - name: Install Calico Operator
+    - name: Create Docker Registry Secret in default namespace
+      shell: |
+        kubectl create secret docker-registry {{ docker_secret_name }} \
+          --docker-server={{ docker_registry }} \
+          --docker-username={{ docker_username }} \
+          --docker-password={{ docker_password }} \
+          --docker-email={{ docker_email }}
+      ignore_errors: yes
+
+    - name: Create Docker Registry Secret in calico-system namespace
+      shell: |
+        kubectl create namespace calico-system
+        kubectl create secret docker-registry {{ docker_secret_name }} \
+          --docker-server={{ docker_registry }} \
+          --docker-username={{ docker_username }} \
+          --docker-password={{ docker_password }} \
+          --docker-email={{ docker_email }} \
+          --namespace=calico-system
+      ignore_errors: yes
+
+    - name: Install Calico Operator with image pull secret
       shell: |
         kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.30.2/manifests/operator-crds.yaml
         kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.30.2/manifests/tigera-operator.yaml
+        kubectl patch deployment tigera-operator -n tigera-operator -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"{{ docker_secret_name }}"}]}}}}'
 
-    - name: Install Calico
+    - name: Install Calico with image pull secret
       shell: |
         kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.30.2/manifests/custom-resources.yaml
         kubectl patch installation default --type=merge --patch='{"spec":{"calicoNetwork":{"containerIPForwarding":"Enabled"}}}'
+        kubectl patch daemonset calico-node -n calico-system -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"{{ docker_secret_name }}"}]}}}}'
+        kubectl patch deployment calico-typha -n calico-system -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"{{ docker_secret_name }}"}]}}}}'
 
     - name: Install Nginx Ingress Controller
       shell: |
@@ -62,42 +85,19 @@
 
     - name: Wait for Calico pods to be ready
       shell: |
-        kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=csi-node-driver -n calico-system --timeout=300s
+        kubectl wait --for=condition=ready pod -l k8s-app=calico-node -n calico-system --timeout=300s
       ignore_errors: yes
 
-    - name: Create Docker Registry Secret in calico-system namespace
+    - name: Wait for Calico operator pods to be ready
       shell: |
-        kubectl create secret docker-registry {{ docker_secret_name }} \
-          --docker-server={{ docker_registry }} \
-          --docker-username={{ docker_username }} \
-          --docker-password={{ docker_password }} \
-          --docker-email={{ docker_email }} \
-          --namespace=calico-system
-      ignore_errors: yes
-
-    - name: Patch csi-node-driver ServiceAccount with image pull secret
-      shell: |
-        kubectl patch serviceaccount csi-node-driver -n calico-system -p '{"imagePullSecrets": [{"name": "{{ docker_secret_name }}"}]}'
-      ignore_errors: yes
-
-    - name: Patch csi-node-driver DaemonSet with image pull secret
-      shell: |
-        kubectl patch daemonset csi-node-driver -n calico-system -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"{{ docker_secret_name }}"}]}}}}'
-      ignore_errors: yes
-
-    - name: Restart csi-node-driver DaemonSet
-      shell: |
-        kubectl rollout restart daemonset csi-node-driver -n calico-system
-      ignore_errors: yes
-
-    - name: Wait for csi-node-driver pods to be ready after restart
-      shell: |
-        kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=csi-node-driver -n calico-system --timeout=300s
+        kubectl wait --for=condition=ready pod -l name=tigera-operator -n tigera-operator --timeout=300s
       ignore_errors: yes
 
     - name: Display final status
       shell: |
         echo "=== Final Status ==="
         kubectl get pods -n calico-system
+        kubectl get pods -n tigera-operator
+        kubectl get pods -n kube-system | grep calico
         echo "=== Docker Secret Status ==="
         kubectl get secret {{ docker_secret_name }} -n calico-system
