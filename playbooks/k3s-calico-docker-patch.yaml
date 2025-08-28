@@ -48,14 +48,53 @@
           --namespace=calico-system
       ignore_errors: true
 
+    - name: Create Docker Registry Secret in default namespace
+      shell: |
+        kubectl create secret docker-registry {{ docker_secret }} \
+          --docker-server={{ docker_registry }} \
+          --docker-username={{ docker_username }} \
+          --docker-password={{ docker_password }} \
+          --docker-email={{ docker_email }} \
+          --namespace=default
+      ignore_errors: true
+
+    - name: Create Docker Registry Secret in kube-system namespace
+      shell: |
+        kubectl create secret docker-registry {{ docker_secret }} \
+          --docker-server={{ docker_registry }} \
+          --docker-username={{ docker_username }} \
+          --docker-password={{ docker_password }} \
+          --docker-email={{ docker_email }} \
+          --namespace=kube-system
+      ignore_errors: true
+
     - name: Get all Deployments in calico-system namespace
       shell: kubectl get deployments -n calico-system -o jsonpath='{.items[*].metadata.name}'
       register: calico_deployments
       ignore_errors: true
 
+    - name: Create temporary JSON patch file for Deployments
+      copy:
+        content: |
+          {
+            "spec": {
+              "template": {
+                "spec": {
+                  "imagePullSecrets": [
+                    {
+                      "name": "{{ docker_secret }}"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        dest: /tmp/deployment-patch.json
+        mode: "0644"
+
     - name: Patch all Deployments with image pull secret
       shell: |
-        kubectl patch deployment {{ item }} -n calico-system -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"{{ docker_secret }}"}]}}}'
+        kubectl patch deployment {{ item }} -n calico-system --patch-file /tmp/deployment-patch.json
       loop: "{{ calico_deployments.stdout.split() }}"
       ignore_errors: true
       when: calico_deployments.stdout != ""
@@ -67,7 +106,7 @@
 
     - name: Patch all DaemonSets with image pull secret
       shell: |
-        kubectl patch daemonset {{ item }} -n calico-system -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"{{ docker_secret }}"}]}}}'
+        kubectl patch daemonset {{ item }} -n calico-system --patch-file /tmp/deployment-patch.json
       loop: "{{ calico_daemonsets.stdout.split() }}"
       ignore_errors: true
       when: calico_daemonsets.stdout != ""
@@ -79,10 +118,15 @@
 
     - name: Patch all StatefulSets with image pull secret
       shell: |
-        kubectl patch statefulset {{ item }} -n calico-system -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"{{ docker_secret }}"}]}}}'
+        kubectl patch statefulset {{ item }} -n calico-system --patch-file /tmp/deployment-patch.json
       loop: "{{ calico_statefulsets.stdout.split() }}"
       ignore_errors: true
       when: calico_statefulsets.stdout != ""
+
+    - name: Clean up temporary patch file
+      file:
+        path: /tmp/deployment-patch.json
+        state: absent
 
     - name: Restart all Deployments in calico-system
       shell: |
@@ -128,8 +172,18 @@
     - name: Display final status
       shell: |
         echo "=== Final Status ==="
+        echo "=== Calico System Pods ==="
         kubectl get pods -n calico-system
+        echo "=== Kube System Pods ==="
+        kubectl get pods -n kube-system
+        echo "=== Default Namespace Pods ==="
+        kubectl get pods -n default
         echo "=== Docker Secret Status ==="
+        echo "Calico System:"
         kubectl get secret {{ docker_secret }} -n calico-system
+        echo "Kube System:"
+        kubectl get secret {{ docker_secret }} -n kube-system
+        echo "Default:"
+        kubectl get secret {{ docker_secret }} -n default
         echo "=== All Resources in calico-system ==="
         kubectl get all -n calico-system
