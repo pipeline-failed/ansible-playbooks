@@ -60,16 +60,3 @@
     - name: Install Cert Manager
       shell: |
         kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.3/cert-manager.yaml
-
-    - name: Wait for Calico pods to be ready
-      shell: |
-        kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=csi-node-driver -n calico-system --timeout=300s
-      ignore_errors: true
-
-    - name: Display cluster status
-      shell: |
-        echo "=== K3s Cluster Status ==="
-        kubectl get nodes
-        echo "=== Calico System Pods ==="
-        kubectl get pods -n calico-system
-        echo "=== Cluster is ready for Docker registry patching ==="
