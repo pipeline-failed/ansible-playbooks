@@ -36,6 +36,13 @@
       shell: |
         curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server --cluster-init --disable traefik --flannel-backend=none --disable-network-policy" sh -
 
+    - name: Wait for K3s to be ready
+      wait_for:
+        port: 6443
+        host: localhost
+        delay: 10
+        timeout: 300
+
     - name: Set Kubeconfig
       shell: |
         mkdir -p ~/.kube
@@ -48,10 +55,18 @@
         kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.30.2/manifests/operator-crds.yaml
         kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.30.2/manifests/tigera-operator.yaml
 
+    - name: Wait for Calico Operator to be ready
+      pause:
+        seconds: 45
+
     - name: Install Calico
       shell: |
         kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.30.2/manifests/custom-resources.yaml
         kubectl patch installation default --type=merge --patch='{"spec":{"calicoNetwork":{"contai nerIPForwarding":"Enabled"}}}'
+
+    - name: Wait for Calico to be ready
+      pause:
+        seconds: 60
 
     - name: Install Nginx Ingress Controller
       shell: |
