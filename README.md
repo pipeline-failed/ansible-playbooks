@@ -5,7 +5,6 @@ This repository contains Ansible playbooks for automating the setup and configur
 ## Project Structure
 - `playbooks/` - Directory containing all Ansible playbooks
   - `install/` - Installation playbooks for various services
-  - `setup/` - Configuration and setup playbooks for Kubernetes and ArgoCD
 - `inventories/` - Contains inventory files for different environments
   - `group_vars/` - Directory for group variables
 - `Vagrantfile` - Configuration for local development using Vagrant
