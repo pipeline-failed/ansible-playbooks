@@ -4,11 +4,11 @@
   become: true
 
   vars:
-    docker_secret_name: "docker-registry-secret"
-    docker_registry: "{{ docker_registry | default('registry.example.com') }}"
-    docker_username: "{{ docker_username | default('username') }}"
-    docker_password: "{{ docker_password | default('password') }}"
-    docker_email: "{{ docker_email | default('user@example.com') }}"
+    docker_secret: "{{ docker_secret_name | default('docker-registry-secret') }}"
+    docker_registry: "{{ ansible_docker_registry | default('registry.example.com') }}"
+    docker_username: "{{ ansible_docker_username | default('username') }}"
+    docker_password: "{{ ansible_docker_password | default('password') }}"
+    docker_email: "{{ ansible_docker_email | default('user@example.com') }}"
 
   tasks:
     - name: Check if K3s is running
@@ -40,7 +40,7 @@
 
     - name: Create Docker Registry Secret in calico-system namespace
       shell: |
-        kubectl create secret docker-registry {{ docker_secret_name }} \
+        kubectl create secret docker-registry {{ docker_secret }} \
           --docker-server={{ docker_registry }} \
           --docker-username={{ docker_username }} \
           --docker-password={{ docker_password }} \
@@ -48,24 +48,81 @@
           --namespace=calico-system
       ignore_errors: true
 
-    - name: Patch csi-node-driver ServiceAccount with image pull secret
-      shell: |
-        kubectl patch serviceaccount csi-node-driver -n calico-system -p '{"imagePullSecrets": [{"name": "{{ docker_secret_name }}"}]}'
+    - name: Get all Deployments in calico-system namespace
+      shell: kubectl get deployments -n calico-system -o jsonpath='{.items[*].metadata.name}'
+      register: calico_deployments
       ignore_errors: true
 
-    - name: Patch csi-node-driver DaemonSet with image pull secret
+    - name: Patch all Deployments with image pull secret
       shell: |
-        kubectl patch daemonset csi-node-driver -n calico-system -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"{{ docker_secret_name }}"}]}}}}'
+        kubectl patch deployment {{ item }} -n calico-system -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"{{ docker_secret }}"}]}}}'
+      loop: "{{ calico_deployments.stdout.split() }}"
+      ignore_errors: true
+      when: calico_deployments.stdout != ""
+
+    - name: Get all DaemonSets in calico-system namespace
+      shell: kubectl get daemonsets -n calico-system -o jsonpath='{.items[*].metadata.name}'
+      register: calico_daemonsets
       ignore_errors: true
 
-    - name: Restart csi-node-driver DaemonSet
+    - name: Patch all DaemonSets with image pull secret
       shell: |
-        kubectl rollout restart daemonset csi-node-driver -n calico-system
+        kubectl patch daemonset {{ item }} -n calico-system -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"{{ docker_secret }}"}]}}}'
+      loop: "{{ calico_daemonsets.stdout.split() }}"
+      ignore_errors: true
+      when: calico_daemonsets.stdout != ""
+
+    - name: Get all StatefulSets in calico-system namespace
+      shell: kubectl get statefulsets -n calico-system -o jsonpath='{.items[*].metadata.name}'
+      register: calico_statefulsets
       ignore_errors: true
 
-    - name: Wait for csi-node-driver pods to be ready after restart
+    - name: Patch all StatefulSets with image pull secret
       shell: |
-        kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=csi-node-driver -n calico-system --timeout=300s
+        kubectl patch statefulset {{ item }} -n calico-system -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"{{ docker_secret }}"}]}}}'
+      loop: "{{ calico_statefulsets.stdout.split() }}"
+      ignore_errors: true
+      when: calico_statefulsets.stdout != ""
+
+    - name: Restart all Deployments in calico-system
+      shell: |
+        kubectl rollout restart deployment {{ item }} -n calico-system
+      loop: "{{ calico_deployments.stdout.split() }}"
+      ignore_errors: true
+      when: calico_deployments.stdout != ""
+
+    - name: Restart all DaemonSets in calico-system
+      shell: |
+        kubectl rollout restart daemonset {{ item }} -n calico-system
+      loop: "{{ calico_daemonsets.stdout.split() }}"
+      ignore_errors: true
+      when: calico_daemonsets.stdout != ""
+
+    - name: Restart all StatefulSets in calico-system
+      shell: |
+        kubectl rollout restart statefulset {{ item }} -n calico-system
+      loop: "{{ calico_statefulsets.stdout.split() }}"
+      ignore_errors: true
+      when: calico_statefulsets.stdout != ""
+
+    - name: Wait for all pods to be ready after restart
+      shell: |
+        kubectl wait --for=condition=ready pod -l app.kubernetes.io/part-of=calico -n calico-system --timeout=600s
+      ignore_errors: true
+
+    - name: Wait for calico-node pods to be ready
+      shell: |
+        kubectl wait --for=condition=ready pod -l k8s-app=calico-node -n calico-system --timeout=600s
+      ignore_errors: true
+
+    - name: Wait for calico-kube-controllers pods to be ready
+      shell: |
+        kubectl wait --for=condition=ready pod -l k8s-app=calico-kube-controllers -n calico-system --timeout=600s
+      ignore_errors: true
+
+    - name: Wait for calico-typha pods to be ready
+      shell: |
+        kubectl wait --for=condition=ready pod -l k8s-app=calico-typha -n calico-system --timeout=600s
       ignore_errors: true
 
     - name: Display final status
@@ -73,4 +130,6 @@
         echo "=== Final Status ==="
         kubectl get pods -n calico-system
         echo "=== Docker Secret Status ==="
-        kubectl get secret {{ docker_secret_name }} -n calico-system
+        kubectl get secret {{ docker_secret }} -n calico-system
+        echo "=== All Resources in calico-system ==="
+        kubectl get all -n calico-system
