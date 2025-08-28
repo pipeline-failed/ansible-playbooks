@@ -1,9 +1,9 @@
 # Docker registry
-docker_registry_server: 
-docker_registry_username: 
+docker_registry_server:
+docker_registry_username:
 docker_registry_password:
-docker_registry_email: 
-docker_secret_name: 
+docker_registry_email:
+docker_secret_name:
 
 # Env secret
 env_secret_name:
@@ -17,5 +17,5 @@ repo_username:
 repo_token:
 
 # k3s slave node
-k3s_master_token: 
-k3s_master_ip: 
+k3s_master_token:
+k3s_master_ip:
