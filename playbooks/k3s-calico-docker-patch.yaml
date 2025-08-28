@@ -4,7 +4,7 @@
   become: true
 
   vars:
-    docker_secret_name: "{{ docker_secret_name | default('docker-registry-secret') }}"
+    docker_secret_name: "docker-registry-secret"
     docker_registry: "{{ docker_registry | default('registry.example.com') }}"
     docker_username: "{{ docker_username | default('username') }}"
     docker_password: "{{ docker_password | default('password') }}"
