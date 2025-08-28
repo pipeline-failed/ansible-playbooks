@@ -1,3 +1,10 @@
 # k3s slave node
 k3s_master_token:
 k3s_master_ip:
+
+# Docker Registry credentials
+docker_registry: docker.io
+docker_username: your_docker_username
+docker_password: your_docker_password
+docker_email: your_email@example.com
+docker_secret_name: registry-secret

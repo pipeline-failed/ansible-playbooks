@@ -3,6 +3,21 @@
   become: true
 
   tasks:
+    - name: Check DNS configuration
+      shell: cat /etc/resolv.conf
+      register: dns_config
+
+    - name: Display DNS configuration
+      debug:
+        msg: "Current DNS configuration: {{ dns_config.stdout_lines }}"
+
+    - name: Add localhost to hosts file
+      lineinfile:
+        path: /etc/hosts
+        line: "127.0.0.1 localhost"
+        state: present
+      ignore_errors: yes
+
     - name: Update apt cache and upgrade packages
       apt:
         update_cache: yes
@@ -44,3 +59,45 @@
     - name: Install Cert Manager
       shell: |
         kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.3/cert-manager.yaml
+
+    - name: Wait for Calico pods to be ready
+      shell: |
+        kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=csi-node-driver -n calico-system --timeout=300s
+      ignore_errors: yes
+
+    - name: Create Docker Registry Secret in calico-system namespace
+      shell: |
+        kubectl create secret docker-registry {{ docker_secret_name }} \
+          --docker-server={{ docker_registry }} \
+          --docker-username={{ docker_username }} \
+          --docker-password={{ docker_password }} \
+          --docker-email={{ docker_email }} \
+          --namespace=calico-system
+      ignore_errors: yes
+
+    - name: Patch csi-node-driver ServiceAccount with image pull secret
+      shell: |
+        kubectl patch serviceaccount csi-node-driver -n calico-system -p '{"imagePullSecrets": [{"name": "{{ docker_secret_name }}"}]}'
+      ignore_errors: yes
+
+    - name: Patch csi-node-driver DaemonSet with image pull secret
+      shell: |
+        kubectl patch daemonset csi-node-driver -n calico-system -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"{{ docker_secret_name }}"}]}}}}'
+      ignore_errors: yes
+
+    - name: Restart csi-node-driver DaemonSet
+      shell: |
+        kubectl rollout restart daemonset csi-node-driver -n calico-system
+      ignore_errors: yes
+
+    - name: Wait for csi-node-driver pods to be ready after restart
+      shell: |
+        kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=csi-node-driver -n calico-system --timeout=300s
+      ignore_errors: yes
+
+    - name: Display final status
+      shell: |
+        echo "=== Final Status ==="
+        kubectl get pods -n calico-system
+        echo "=== Docker Secret Status ==="
+        kubectl get secret {{ docker_secret_name }} -n calico-system
