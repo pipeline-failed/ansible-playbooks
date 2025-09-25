@@ -1,0 +1,54 @@
+---
+- name: "Bootstrap system: update apt, install tools, set fish for root"
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    fish_shell_path: /usr/bin/fish
+
+  pre_tasks:
+    - name: Ensure apt cache is up to date
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Upgrade all packages to the latest version (dist-upgrade)
+      apt:
+        upgrade: dist
+
+  tasks:
+    - name: Install required packages (iptables, micro, fish)
+      apt:
+        name:
+          - iptables
+          - micro
+          - fish
+        state: present
+
+    - name: Verify fish binary exists
+      stat:
+        path: "{{ fish_shell_path }}"
+      register: fish_bin
+
+    - name: Fail if fish binary not found at requested path
+      fail:
+        msg: "Fish shell not found at {{ fish_shell_path }}. Adjust fish_shell_path variable."
+      when: not fish_bin.stat.exists
+
+    - name: Set fish as default shell for root via /etc/passwd
+      lineinfile:
+        path: /etc/passwd
+        regexp: "^(root:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:).*"
+        line: '\1{{ fish_shell_path }}'
+        backrefs: true
+        backup: true
+        create: false
+        mode: "0644"
+      notify: Refresh NSS/passwd cache if available
+
+  handlers:
+    - name: Refresh NSS/passwd cache if available
+      shell: |
+        if command -v nscd >/dev/null 2>&1; then nscd -i passwd || true; fi
+      changed_when: false
