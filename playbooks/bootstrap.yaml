@@ -24,6 +24,7 @@
           - iptables
           - micro
           - fish
+          - btop
         state: present
 
     - name: Verify fish binary exists
