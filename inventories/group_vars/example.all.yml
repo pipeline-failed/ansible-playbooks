@@ -25,4 +25,9 @@ user_sudo: true
 # Если оставить пустым, пароль не будет установлен/изменён
 user_password_hash:
 # Публичные SSH-ключи, которые будут добавлены в authorized_keys пользователя
+# Примеры:
+# user_ssh_public_keys: []  # Без ключей
+# user_ssh_public_keys:
+#   - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... user@hostname"
+#   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... user2@hostname"
 user_ssh_public_keys: []

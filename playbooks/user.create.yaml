@@ -18,12 +18,12 @@
       user:
         name: "{{ user_name }}"
         state: "{{ user_state }}"
-        uid: "{{ user_uid | default(omit) }}"
+        uid: "{{ user_uid if (user_uid is defined and user_uid) else omit }}"
         shell: "{{ user_shell }}"
         create_home: "{{ user_create_home }}"
-        groups: "{{ (user_groups | default([])) | join(',') }}"
+        groups: "{{ (user_groups | default([])) | join(',') if (user_groups | default([]) | length > 0) else omit }}"
         append: true
-        password: "{{ (user_password_hash | default('')) if (user_password_hash | default('') | length) > 0 else omit }}"
+        password: "{{ user_password_hash if (user_password_hash is defined and user_password_hash) else omit }}"
 
     - name: Ensure .ssh directory exists when home is present
       file:
