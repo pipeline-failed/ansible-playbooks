@@ -1,0 +1,66 @@
+---
+- name: "Create or manage user"
+  hosts: all
+  become: true
+  gather_facts: false
+
+  vars:
+    sudoers_dropin_path: "/etc/sudoers.d"
+
+  pre_tasks:
+    - name: Ensure sudo is installed
+      package:
+        name: sudo
+        state: present
+
+  tasks:
+    - name: Create user account
+      user:
+        name: "{{ user_name }}"
+        state: "{{ user_state }}"
+        uid: "{{ user_uid | default(omit) }}"
+        shell: "{{ user_shell }}"
+        create_home: "{{ user_create_home }}"
+        groups: "{{ (user_groups | default([])) | join(',') }}"
+        append: true
+        password: "{{ (user_password_hash | default('')) if (user_password_hash | default('') | length) > 0 else omit }}"
+
+    - name: Ensure .ssh directory exists when home is present
+      file:
+        path: "/home/{{ user_name }}/.ssh"
+        state: directory
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
+        mode: "0700"
+      when: user_state == 'present' and user_create_home | bool
+
+    - name: Install authorized_keys for the user
+      authorized_key:
+        user: "{{ user_name }}"
+        state: present
+        key: "{{ item }}"
+        manage_dir: true
+      loop: "{{ user_ssh_public_keys | default([]) }}"
+      when: user_state == 'present' and (user_ssh_public_keys | default([])) | length > 0
+
+    - name: Configure passwordless sudo (drop-in)
+      copy:
+        dest: "{{ sudoers_dropin_path }}/{{ user_name }}"
+        content: "{{ user_name }} ALL=(ALL) NOPASSWD:ALL\n"
+        owner: root
+        group: root
+        mode: "0440"
+        validate: "visudo -cf %s"
+      when: user_state == 'present' and (user_sudo | bool)
+
+    - name: Remove sudoers drop-in when user should not have sudo
+      file:
+        path: "{{ sudoers_dropin_path }}/{{ user_name }}"
+        state: absent
+      when: user_state == 'present' and not (user_sudo | bool)
+
+    - name: Remove user sudoers drop-in when user absent
+      file:
+        path: "{{ sudoers_dropin_path }}/{{ user_name }}"
+        state: absent
+      when: user_state == 'absent'

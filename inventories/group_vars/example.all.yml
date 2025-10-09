@@ -8,3 +8,21 @@ docker_username: your_docker_username
 docker_password: your_docker_password
 docker_email: your_email@example.com
 docker_secret_name: registry-secret
+
+# Переменные для создания пользователя
+user_name: devops
+# Если нужен фиксированный UID, укажите число; иначе оставьте пустым
+user_uid:
+user_shell: /bin/bash
+user_create_home: true
+# Список дополнительных групп; пустой список, если не требуется
+user_groups: ["sudo"]
+# present | absent
+user_state: present
+# Дать пользователю sudo без пароля
+user_sudo: true
+# Хеш пароля в формате, поддерживаемом Linux (например, mkpasswd --method=SHA-512)
+# Если оставить пустым, пароль не будет установлен/изменён
+user_password_hash:
+# Публичные SSH-ключи, которые будут добавлены в authorized_keys пользователя
+user_ssh_public_keys: []
