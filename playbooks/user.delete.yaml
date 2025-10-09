@@ -6,12 +6,6 @@
 
   vars:
     sudoers_dropin_path: "/etc/sudoers.d"
-    # Массив имен пользователей для удаления
-    users_to_delete: []
-    # Удалить домашнюю директорию пользователя (по умолчанию true)
-    remove_home: true
-    # Принудительно удалить пользователя, даже если он залогинен
-    force_remove: false
 
   pre_tasks:
     - name: Проверка что users_to_delete не пустой
