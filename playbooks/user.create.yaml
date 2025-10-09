@@ -1,5 +1,5 @@
 ---
-- name: "Create or manage user"
+- name: "Создание и управление пользователем"
   hosts: all
   become: true
   gather_facts: false
@@ -8,13 +8,13 @@
     sudoers_dropin_path: "/etc/sudoers.d"
 
   pre_tasks:
-    - name: Ensure sudo is installed
+    - name: Проверка установки sudo
       package:
         name: sudo
         state: present
 
   tasks:
-    - name: Create user account
+    - name: Создание учетной записи пользователя
       user:
         name: "{{ user_name }}"
         state: "{{ user_state }}"
@@ -25,7 +25,7 @@
         append: true
         password: "{{ user_password_hash if (user_password_hash is defined and user_password_hash) else omit }}"
 
-    - name: Ensure .ssh directory exists when home is present
+    - name: Создание директории .ssh при наличии домашней папки
       file:
         path: "/home/{{ user_name }}/.ssh"
         state: directory
@@ -34,7 +34,7 @@
         mode: "0700"
       when: user_state == 'present' and user_create_home | bool
 
-    - name: Install authorized_keys for the user
+    - name: Установка authorized_keys для пользователя
       authorized_key:
         user: "{{ user_name }}"
         state: present
@@ -43,7 +43,7 @@
       loop: "{{ user_ssh_public_keys | default([]) }}"
       when: user_state == 'present' and (user_ssh_public_keys | default([])) | length > 0
 
-    - name: Configure passwordless sudo (drop-in)
+    - name: Настройка sudo без пароля (drop-in файл)
       copy:
         dest: "{{ sudoers_dropin_path }}/{{ user_name }}"
         content: "{{ user_name }} ALL=(ALL) NOPASSWD:ALL\n"
@@ -53,13 +53,13 @@
         validate: "visudo -cf %s"
       when: user_state == 'present' and (user_sudo | bool)
 
-    - name: Remove sudoers drop-in when user should not have sudo
+    - name: Удаление sudoers drop-in когда пользователь не должен иметь sudo
       file:
         path: "{{ sudoers_dropin_path }}/{{ user_name }}"
         state: absent
       when: user_state == 'present' and not (user_sudo | bool)
 
-    - name: Remove user sudoers drop-in when user absent
+    - name: Удаление sudoers drop-in пользователя при отсутствии пользователя
       file:
         path: "{{ sudoers_dropin_path }}/{{ user_name }}"
         state: absent

@@ -1,77 +1,77 @@
 ---
-- name: Install K3s
+- name: Установка K3s с Calico
   hosts: all
   become: true
 
   tasks:
-    - name: Check DNS configuration
+    - name: Проверка конфигурации DNS
       shell: cat /etc/resolv.conf
       register: dns_config
 
-    - name: Display DNS configuration
+    - name: Отображение конфигурации DNS
       debug:
-        msg: "Current DNS configuration: {{ dns_config.stdout_lines }}"
+        msg: "Текущая конфигурация DNS: {{ dns_config.stdout_lines }}"
 
-    - name: Add localhost to hosts file
+    - name: Добавление localhost в файл hosts
       lineinfile:
         path: /etc/hosts
         line: "127.0.0.1 localhost"
         state: present
       ignore_errors: true
 
-    - name: Update apt cache and upgrade packages
+    - name: Обновление кэша apt и пакетов
       apt:
         update_cache: yes
         upgrade: yes
         cache_valid_time: 3600
         force_apt_get: yes
 
-    - name: Install CalicoCtl
+    - name: Установка CalicoCtl
       shell: |
         curl -L https://github.com/projectcalico/calico/releases/latest/download/calicoctl-linux-amd64 -o calicoctl
         chmod +x calicoctl
         mv calicoctl /usr/local/bin/
 
-    - name: Install K3s
+    - name: Установка K3s
       shell: |
         curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server --cluster-init --disable traefik --flannel-backend=none --disable-network-policy" sh -
 
-    - name: Wait for K3s to be ready
+    - name: Ожидание готовности K3s
       wait_for:
         port: 6443
         host: localhost
         delay: 10
         timeout: 300
 
-    - name: Set Kubeconfig
+    - name: Настройка Kubeconfig
       shell: |
         mkdir -p ~/.kube
         cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
         chown $(id -u):$(id -g) ~/.kube/config
         export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
-    - name: Install Calico Operator
+    - name: Установка Calico Operator
       shell: |
         kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.30.2/manifests/operator-crds.yaml
         kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.30.2/manifests/tigera-operator.yaml
 
-    - name: Wait for Calico Operator to be ready
+    - name: Ожидание готовности Calico Operator
       pause:
         seconds: 45
 
-    - name: Install Calico
+    - name: Установка Calico
       shell: |
         kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.30.2/manifests/custom-resources.yaml
         kubectl patch installation default --type=merge --patch='{"spec":{"calicoNetwork":{"contai nerIPForwarding":"Enabled"}}}'
 
-    - name: Wait for Calico to be ready
+    - name: Ожидание готовности Calico
       pause:
         seconds: 60
 
-    - name: Install Nginx Ingress Controller
+    - name: Установка Nginx Ingress Controller
       shell: |
         kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
 
-    - name: Install Cert Manager
+    - name: Установка Cert Manager
       shell: |
         kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.3/cert-manager.yaml

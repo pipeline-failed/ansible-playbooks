@@ -1,5 +1,5 @@
 ---
-- name: "Bootstrap system: update apt, install tools, set fish for root"
+- name: "Инициализация системы: обновление apt, установка инструментов, настройка fish для root"
   hosts: all
   become: true
   gather_facts: true
@@ -8,17 +8,17 @@
     fish_shell_path: /usr/bin/fish
 
   pre_tasks:
-    - name: Ensure apt cache is up to date
+    - name: Проверка актуальности кэша apt
       apt:
         update_cache: true
         cache_valid_time: 3600
 
-    - name: Upgrade all packages to the latest version (dist-upgrade)
+    - name: Обновление всех пакетов до последней версии (dist-upgrade)
       apt:
         upgrade: dist
 
   tasks:
-    - name: Install required packages (iptables, micro, fish)
+    - name: Установка необходимых пакетов (iptables, micro, fish)
       apt:
         name:
           - iptables
@@ -27,17 +27,17 @@
           - btop
         state: present
 
-    - name: Verify fish binary exists
+    - name: Проверка существования исполняемого файла fish
       stat:
         path: "{{ fish_shell_path }}"
       register: fish_bin
 
-    - name: Fail if fish binary not found at requested path
+    - name: Остановка с ошибкой если fish не найден по указанному пути
       fail:
-        msg: "Fish shell not found at {{ fish_shell_path }}. Adjust fish_shell_path variable."
+        msg: "Fish shell не найден по пути {{ fish_shell_path }}. Настройте переменную fish_shell_path."
       when: not fish_bin.stat.exists
 
-    - name: Set fish as default shell for root via /etc/passwd
+    - name: Установка fish как оболочки по умолчанию для root через /etc/passwd
       lineinfile:
         path: /etc/passwd
         regexp: "^(root:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:).*"
@@ -46,10 +46,10 @@
         backup: true
         create: false
         mode: "0644"
-      notify: Refresh NSS/passwd cache if available
+      notify: Обновить кэш NSS/passwd если доступен
 
   handlers:
-    - name: Refresh NSS/passwd cache if available
+    - name: Обновление кэша NSS/passwd если доступен
       shell: |
         if command -v nscd >/dev/null 2>&1; then nscd -i passwd || true; fi
       changed_when: false

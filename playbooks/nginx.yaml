@@ -1,41 +1,40 @@
 ---
-- name: Install and configure NGINX
-  hosts: all  
-  become: true       
+- name: Установка и настройка NGINX
+  hosts: all
+  become: true
 
   tasks:
-    - name: Update apt cache and upgrade packages
+    - name: Обновление кэша apt и пакетов
       apt:
         update_cache: yes
         upgrade: yes
         cache_valid_time: 3600
         force_apt_get: yes
 
-    - name: Install NGINX package
+    - name: Установка пакета NGINX
       apt:
         name: nginx
         state: present
         update_cache: yes
       when: ansible_os_family == "Debian"
 
-    - name: Install Certbot package
+    - name: Установка пакета Certbot
       apt:
-        name: 
+        name:
           - certbot
           - python3-certbot-nginx
         state: present
         update_cache: yes
       when: ansible_os_family == "Debian"
 
-    - name: Start NGINX service
+    - name: Запуск сервиса NGINX
       service:
         name: nginx
         state: started
         enabled: yes
-    
 
   handlers:
-    - name: Restart NGINX
+    - name: Перезапуск NGINX
       service:
         name: nginx
         state: restarted

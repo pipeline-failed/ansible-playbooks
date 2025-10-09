@@ -31,3 +31,16 @@ user_password_hash:
 #   - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... user@hostname"
 #   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... user2@hostname"
 user_ssh_public_keys: []
+
+# Массив имен пользователей для удаления
+users_to_delete:
+  - "testuser1"
+  - "testuser2"
+  - "olduser"
+  - "tempuser"
+# Удалить домашнюю директорию пользователя
+# Если false - домашняя директория останется в системе
+remove_home: true
+# Принудительно удалить пользователя, даже если он залогинен
+# ВНИМАНИЕ: Это завершит все процессы пользователя!
+force_remove: false

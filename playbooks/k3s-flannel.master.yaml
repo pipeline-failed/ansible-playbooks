@@ -1,31 +1,31 @@
-- name: Install K3s
+---
+- name: Установка K3s с Flannel
   hosts: all
   become: true
 
   tasks:
-    - name: Update apt cache and upgrade packages
+    - name: Обновление кэша apt и пакетов
       apt:
         update_cache: yes
         upgrade: yes
         cache_valid_time: 3600
         force_apt_get: yes
 
-    - name: Install K3s
+    - name: Установка K3s
       shell: |
         curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server --cluster-init --disable traefik " sh -
 
-    - name: Set Kubeconfig
+    - name: Настройка Kubeconfig
       shell: |
         mkdir -p ~/.kube
         cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
         chown $(id -u):$(id -g) ~/.kube/config
         export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
-    - name: Install Nginx Ingress Controller
+    - name: Установка Nginx Ingress Controller
       shell: |
         kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
 
-
-    - name: Install Cert Manager
+    - name: Установка Cert Manager
       shell: |
-        kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.3/cert-manager.yaml 
+        kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.3/cert-manager.yaml

@@ -1,0 +1,91 @@
+---
+- name: "Удаление пользователей из системы"
+  hosts: all
+  become: true
+  gather_facts: false
+
+  vars:
+    sudoers_dropin_path: "/etc/sudoers.d"
+    # Массив имен пользователей для удаления
+    users_to_delete: []
+    # Удалить домашнюю директорию пользователя (по умолчанию true)
+    remove_home: true
+    # Принудительно удалить пользователя, даже если он залогинен
+    force_remove: false
+
+  pre_tasks:
+    - name: Проверка что users_to_delete не пустой
+      fail:
+        msg: "Переменная users_to_delete не может быть пустой. Укажите список пользователей для удаления."
+      when: users_to_delete | length == 0
+
+    - name: Отображение пользователей для удаления
+      debug:
+        msg: "Будут удалены следующие пользователи: {{ users_to_delete | join(', ') }}"
+
+  tasks:
+    - name: Проверка существования пользователей перед удалением
+      getent:
+        database: passwd
+        key: "{{ item }}"
+      register: user_exists
+      failed_when: false
+      loop: "{{ users_to_delete }}"
+
+    - name: Отображение несуществующих пользователей
+      debug:
+        msg: "Пользователь {{ item.item }} не существует в системе"
+      loop: "{{ user_exists.results }}"
+      when: item.failed | default(false)
+
+    - name: Завершение всех процессов пользователей для удаления
+      shell: "pkill -u {{ item.item }} || true"
+      loop: "{{ user_exists.results }}"
+      when:
+        - not (item.failed | default(false))
+        - force_remove | bool
+      ignore_errors: true
+
+    - name: Удаление sudoers drop-in файлов пользователей
+      file:
+        path: "{{ sudoers_dropin_path }}/{{ item.item }}"
+        state: absent
+      loop: "{{ user_exists.results }}"
+      when: not (item.failed | default(false))
+
+    - name: Удаление учетных записей пользователей
+      user:
+        name: "{{ item.item }}"
+        state: absent
+        remove: "{{ remove_home | bool }}"
+        force: "{{ force_remove | bool }}"
+      loop: "{{ user_exists.results }}"
+      when: not (item.failed | default(false))
+      register: user_deletion_result
+
+    - name: Отображение результатов удаления
+      debug:
+        msg: "Пользователь {{ item.item }} успешно удален"
+      loop: "{{ user_deletion_result.results | default([]) }}"
+      when:
+        - item is defined
+        - not (item.failed | default(false))
+
+    - name: Удаление оставшихся файлов пользователей в /tmp
+      shell: "find /tmp -user {{ item.item }} -delete 2>/dev/null || true"
+      loop: "{{ user_exists.results }}"
+      when:
+        - not (item.failed | default(false))
+        - remove_home | bool
+      ignore_errors: true
+
+    - name: Удаление пользователя из crontab
+      shell: "crontab -r -u {{ item.item }} 2>/dev/null || true"
+      loop: "{{ user_exists.results }}"
+      when: not (item.failed | default(false))
+      ignore_errors: true
+
+  post_tasks:
+    - name: Отображение сводки удаленных пользователей
+      debug:
+        msg: "Операция удаления пользователей завершена. Проверьте логи выше для деталей."

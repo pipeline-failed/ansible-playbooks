@@ -1,5 +1,5 @@
 ---
-- name: Patch K3s Calico cluster with Docker registry
+- name: Патч K3s Calico кластера с Docker registry
   hosts: all
   become: true
 
@@ -11,34 +11,34 @@
     docker_email: "{{ ansible_docker_email | default('user@example.com') }}"
 
   tasks:
-    - name: Check if K3s is running
+    - name: Проверка запущен ли K3s
       shell: systemctl is-active k3s
       register: k3s_status
       ignore_errors: true
 
-    - name: Fail if K3s is not running
+    - name: Остановка с ошибкой если K3s не запущен
       fail:
-        msg: "K3s service is not running. Please install K3s first."
+        msg: "Сервис K3s не запущен. Пожалуйста, сначала установите K3s."
       when: k3s_status.rc != 0
 
-    - name: Set Kubeconfig
+    - name: Настройка Kubeconfig
       shell: |
         mkdir -p ~/.kube
         cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
         chown $(id -u):$(id -g) ~/.kube/config
         export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
-    - name: Check if Calico is installed
+    - name: Проверка установки Calico
       shell: kubectl get namespace calico-system
       register: calico_namespace
       ignore_errors: true
 
-    - name: Fail if Calico namespace doesn't exist
+    - name: Остановка с ошибкой если namespace Calico не существует
       fail:
-        msg: "Calico namespace not found. Please install Calico first."
+        msg: "Namespace Calico не найден. Пожалуйста, сначала установите Calico."
       when: calico_namespace.rc != 0
 
-    - name: Create Docker Registry Secret in calico-system namespace
+    - name: Создание Docker Registry Secret в namespace calico-system
       shell: |
         kubectl create secret docker-registry {{ docker_secret }} \
           --docker-server={{ docker_registry }} \
@@ -48,7 +48,7 @@
           --namespace=calico-system
       ignore_errors: true
 
-    - name: Create Docker Registry Secret in default namespace
+    - name: Создание Docker Registry Secret в namespace default
       shell: |
         kubectl create secret docker-registry {{ docker_secret }} \
           --docker-server={{ docker_registry }} \
@@ -58,7 +58,7 @@
           --namespace=default
       ignore_errors: true
 
-    - name: Create Docker Registry Secret in kube-system namespace
+    - name: Создание Docker Registry Secret в namespace kube-system
       shell: |
         kubectl create secret docker-registry {{ docker_secret }} \
           --docker-server={{ docker_registry }} \
@@ -68,12 +68,12 @@
           --namespace=kube-system
       ignore_errors: true
 
-    - name: Get all Deployments in calico-system namespace
+    - name: Получение всех Deployments в namespace calico-system
       shell: kubectl get deployments -n calico-system -o jsonpath='{.items[*].metadata.name}'
       register: calico_deployments
       ignore_errors: true
 
-    - name: Create temporary JSON patch file for Deployments
+    - name: Создание временного JSON патч файла для Deployments
       copy:
         content: |
           {
@@ -92,98 +92,98 @@
         dest: /tmp/deployment-patch.json
         mode: "0644"
 
-    - name: Patch all Deployments with image pull secret
+    - name: Применение патча ко всем Deployments с image pull secret
       shell: |
         kubectl patch deployment {{ item }} -n calico-system --patch-file /tmp/deployment-patch.json
       loop: "{{ calico_deployments.stdout.split() }}"
       ignore_errors: true
       when: calico_deployments.stdout != ""
 
-    - name: Get all DaemonSets in calico-system namespace
+    - name: Получение всех DaemonSets в namespace calico-system
       shell: kubectl get daemonsets -n calico-system -o jsonpath='{.items[*].metadata.name}'
       register: calico_daemonsets
       ignore_errors: true
 
-    - name: Patch all DaemonSets with image pull secret
+    - name: Применение патча ко всем DaemonSets с image pull secret
       shell: |
         kubectl patch daemonset {{ item }} -n calico-system --patch-file /tmp/deployment-patch.json
       loop: "{{ calico_daemonsets.stdout.split() }}"
       ignore_errors: true
       when: calico_daemonsets.stdout != ""
 
-    - name: Get all StatefulSets in calico-system namespace
+    - name: Получение всех StatefulSets в namespace calico-system
       shell: kubectl get statefulsets -n calico-system -o jsonpath='{.items[*].metadata.name}'
       register: calico_statefulsets
       ignore_errors: true
 
-    - name: Patch all StatefulSets with image pull secret
+    - name: Применение патча ко всем StatefulSets с image pull secret
       shell: |
         kubectl patch statefulset {{ item }} -n calico-system --patch-file /tmp/deployment-patch.json
       loop: "{{ calico_statefulsets.stdout.split() }}"
       ignore_errors: true
       when: calico_statefulsets.stdout != ""
 
-    - name: Clean up temporary patch file
+    - name: Очистка временного патч файла
       file:
         path: /tmp/deployment-patch.json
         state: absent
 
-    - name: Restart all Deployments in calico-system
+    - name: Перезапуск всех Deployments в calico-system
       shell: |
         kubectl rollout restart deployment {{ item }} -n calico-system
       loop: "{{ calico_deployments.stdout.split() }}"
       ignore_errors: true
       when: calico_deployments.stdout != ""
 
-    - name: Restart all DaemonSets in calico-system
+    - name: Перезапуск всех DaemonSets в calico-system
       shell: |
         kubectl rollout restart daemonset {{ item }} -n calico-system
       loop: "{{ calico_daemonsets.stdout.split() }}"
       ignore_errors: true
       when: calico_daemonsets.stdout != ""
 
-    - name: Restart all StatefulSets in calico-system
+    - name: Перезапуск всех StatefulSets в calico-system
       shell: |
         kubectl rollout restart statefulset {{ item }} -n calico-system
       loop: "{{ calico_statefulsets.stdout.split() }}"
       ignore_errors: true
       when: calico_statefulsets.stdout != ""
 
-    - name: Wait for all pods to be ready after restart
+    - name: Ожидание готовности всех подов после перезапуска
       shell: |
         kubectl wait --for=condition=ready pod -l app.kubernetes.io/part-of=calico -n calico-system --timeout=600s
       ignore_errors: true
 
-    - name: Wait for calico-node pods to be ready
+    - name: Ожидание готовности calico-node подов
       shell: |
         kubectl wait --for=condition=ready pod -l k8s-app=calico-node -n calico-system --timeout=600s
       ignore_errors: true
 
-    - name: Wait for calico-kube-controllers pods to be ready
+    - name: Ожидание готовности calico-kube-controllers подов
       shell: |
         kubectl wait --for=condition=ready pod -l k8s-app=calico-kube-controllers -n calico-system --timeout=600s
       ignore_errors: true
 
-    - name: Wait for calico-typha pods to be ready
+    - name: Ожидание готовности calico-typha подов
       shell: |
         kubectl wait --for=condition=ready pod -l k8s-app=calico-typha -n calico-system --timeout=600s
       ignore_errors: true
 
-    - name: Display final status
+    - name: Отображение финального статуса
       shell: |
-        echo "=== Final Status ==="
-        echo "=== Calico System Pods ==="
+        echo "=== Финальный Статус ==="
+        echo "=== Поды Calico System ==="
         kubectl get pods -n calico-system
-        echo "=== Kube System Pods ==="
+        echo "=== Поды Kube System ==="
         kubectl get pods -n kube-system
-        echo "=== Default Namespace Pods ==="
+        echo "=== Поды Default Namespace ==="
         kubectl get pods -n default
-        echo "=== Docker Secret Status ==="
+        echo "=== Статус Docker Secret ==="
         echo "Calico System:"
         kubectl get secret {{ docker_secret }} -n calico-system
         echo "Kube System:"
         kubectl get secret {{ docker_secret }} -n kube-system
         echo "Default:"
         kubectl get secret {{ docker_secret }} -n default
-        echo "=== All Resources in calico-system ==="
+        echo "=== Все Ресурсы в calico-system ==="
         kubectl get all -n calico-system
