@@ -1,0 +1,57 @@
+---
+- name: Unseal Vault
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Проверка доступности пода Vault
+      shell: kubectl get pod {{ vault_pod_name }} -n {{ vault_namespace }}
+      register: vault_pod_status
+      failed_when: vault_pod_status.rc != 0
+      changed_when: false
+
+    - name: Отображение статуса пода Vault
+      debug:
+        msg: "Статус пода Vault: {{ vault_pod_status.stdout }}"
+
+    - name: Unseal Vault с первым ключом
+      shell: kubectl exec -it {{ vault_pod_name }} -n {{ vault_namespace }} -- vault operator unseal {{ vault_unseal_keys[0] }}
+      register: unseal_result_1
+      changed_when: "'Unseal Progress' in unseal_result_1.stdout"
+
+    - name: Отображение результата первого unseal
+      debug:
+        msg: "Результат первого unseal: {{ unseal_result_1.stdout }}"
+
+    - name: Unseal Vault со вторым ключом
+      shell: kubectl exec -it {{ vault_pod_name }} -n {{ vault_namespace }} -- vault operator unseal {{ vault_unseal_keys[1] }}
+      register: unseal_result_2
+      changed_when: "'Unseal Progress' in unseal_result_2.stdout"
+
+    - name: Отображение результата второго unseal
+      debug:
+        msg: "Результат второго unseal: {{ unseal_result_2.stdout }}"
+
+    - name: Unseal Vault с третьим ключом
+      shell: kubectl exec -it {{ vault_pod_name }} -n {{ vault_namespace }} -- vault operator unseal {{ vault_unseal_keys[2] }}
+      register: unseal_result_3
+      changed_when: "'Unseal Progress' in unseal_result_3.stdout"
+
+    - name: Отображение результата третьего unseal
+      debug:
+        msg: "Результат третьего unseal: {{ unseal_result_3.stdout }}"
+
+    - name: Проверка статуса Vault после unseal
+      shell: kubectl exec {{ vault_pod_name }} -n {{ vault_namespace }} -- vault status
+      register: vault_final_status
+      changed_when: false
+      failed_when: false
+
+    - name: Отображение финального статуса Vault
+      debug:
+        msg: "Финальный статус Vault: {{ vault_final_status.stdout }}"
+
+    - name: Проверка успешности unseal
+      fail:
+        msg: "Vault не был успешно unsealed. Проверьте ключи и статус."
+      when: "'Sealed          false' not in vault_final_status.stdout"
