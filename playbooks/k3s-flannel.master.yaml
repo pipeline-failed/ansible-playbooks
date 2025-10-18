@@ -22,6 +22,21 @@
         chown $(id -u):$(id -g) ~/.kube/config
         export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
+    - name: Установка Helm
+      shell: |
+        curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        chmod 700 get_helm.sh
+        ./get_helm.sh
+        rm get_helm.sh
+
+    - name: Проверка установки Helm
+      shell: helm version --short
+      register: helm_version
+
+    - name: Отображение версии Helm
+      debug:
+        msg: "Установленная версия Helm: {{ helm_version.stdout }}"
+
     - name: Установка Nginx Ingress Controller
       shell: |
         kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
