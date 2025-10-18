@@ -38,6 +38,12 @@
         msg: "Namespace Calico не найден. Пожалуйста, сначала установите Calico."
       when: calico_namespace.rc != 0
 
+    - name: Удаление старых Docker Registry Secret
+      shell: |
+        kubectl delete secret {{ docker_secret }} -n calico-system --ignore-not-found=true
+        kubectl delete secret {{ docker_secret }} -n kube-system --ignore-not-found=true
+        kubectl delete secret {{ docker_secret }} -n default --ignore-not-found=true
+
     - name: Создание Docker Registry Secret в namespace calico-system
       shell: |
         kubectl create secret docker-registry {{ docker_secret }} \
@@ -46,17 +52,6 @@
           --docker-password={{ docker_password }} \
           --docker-email={{ docker_email }} \
           --namespace=calico-system
-      ignore_errors: true
-
-    - name: Создание Docker Registry Secret в namespace default
-      shell: |
-        kubectl create secret docker-registry {{ docker_secret }} \
-          --docker-server={{ docker_registry }} \
-          --docker-username={{ docker_username }} \
-          --docker-password={{ docker_password }} \
-          --docker-email={{ docker_email }} \
-          --namespace=default
-      ignore_errors: true
 
     - name: Создание Docker Registry Secret в namespace kube-system
       shell: |
@@ -66,7 +61,32 @@
           --docker-password={{ docker_password }} \
           --docker-email={{ docker_email }} \
           --namespace=kube-system
-      ignore_errors: true
+
+    - name: Создание Docker Registry Secret в namespace default
+      shell: |
+        kubectl create secret docker-registry {{ docker_secret }} \
+          --docker-server={{ docker_registry }} \
+          --docker-username={{ docker_username }} \
+          --docker-password={{ docker_password }} \
+          --docker-email={{ docker_email }} \
+          --namespace=default
+
+    - name: Патчинг ServiceAccount для использования imagePullSecrets
+      shell: |
+        # Патчинг ServiceAccount в calico-system (где находятся все поды включая goldmane и whisker)
+        kubectl patch serviceaccount default -n calico-system -p '{"imagePullSecrets": [{"name": "{{ docker_secret }}"}]}' || true
+        kubectl patch serviceaccount calico-node -n calico-system -p '{"imagePullSecrets": [{"name": "{{ docker_secret }}"}]}' || true
+        kubectl patch serviceaccount calico-kube-controllers -n calico-system -p '{"imagePullSecrets": [{"name": "{{ docker_secret }}"}]}' || true
+        kubectl patch serviceaccount calico-typha -n calico-system -p '{"imagePullSecrets": [{"name": "{{ docker_secret }}"}]}' || true
+        kubectl patch serviceaccount csi-node-driver -n calico-system -p '{"imagePullSecrets": [{"name": "{{ docker_secret }}"}]}' || true
+
+        # Патчинг ServiceAccount для пользовательских приложений
+        kubectl patch serviceaccount goldmane -n calico-system -p '{"imagePullSecrets": [{"name": "{{ docker_secret }}"}]}' || true
+        kubectl patch serviceaccount whisker -n calico-system -p '{"imagePullSecrets": [{"name": "{{ docker_secret }}"}]}' || true
+
+        # Патчинг ServiceAccount в других namespace
+        kubectl patch serviceaccount default -n kube-system -p '{"imagePullSecrets": [{"name": "{{ docker_secret }}"}]}' || true
+        kubectl patch serviceaccount default -n default -p '{"imagePullSecrets": [{"name": "{{ docker_secret }}"}]}' || true
 
     - name: Получение всех Deployments в namespace calico-system
       shell: kubectl get deployments -n calico-system -o jsonpath='{.items[*].metadata.name}'
@@ -128,6 +148,20 @@
         path: /tmp/deployment-patch.json
         state: absent
 
+    - name: Дополнительный патчинг goldmane и whisker (если они есть)
+      shell: |
+        # Проверяем есть ли goldmane и whisker, и патчим их отдельно
+        if kubectl get deployment goldmane -n calico-system >/dev/null 2>&1; then
+          echo "Патчинг goldmane deployment..."
+          kubectl patch deployment goldmane -n calico-system -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"{{ docker_secret }}"}]}}}}'
+        fi
+
+        if kubectl get deployment whisker -n calico-system >/dev/null 2>&1; then
+          echo "Патчинг whisker deployment..."
+          kubectl patch deployment whisker -n calico-system -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"{{ docker_secret }}"}]}}}}'
+        fi
+      ignore_errors: true
+
     - name: Перезапуск всех Deployments в calico-system
       shell: |
         kubectl rollout restart deployment {{ item }} -n calico-system
@@ -148,6 +182,17 @@
       loop: "{{ calico_statefulsets.stdout.split() }}"
       ignore_errors: true
       when: calico_statefulsets.stdout != ""
+
+    - name: Принудительное удаление проблемных подов goldmane и whisker
+      shell: |
+        # Удаляем все поды goldmane и whisker для их пересоздания с новыми секретами
+        kubectl delete pod -n calico-system -l app=goldmane --ignore-not-found=true
+        kubectl delete pod -n calico-system -l app=whisker --ignore-not-found=true
+
+        # Также попробуем удалить по другим селекторам
+        kubectl get pods -n calico-system | grep goldmane | awk '{print $1}' | xargs -r kubectl delete pod -n calico-system
+        kubectl get pods -n calico-system | grep whisker | awk '{print $1}' | xargs -r kubectl delete pod -n calico-system
+      ignore_errors: true
 
     - name: Ожидание готовности всех подов после перезапуска
       shell: |

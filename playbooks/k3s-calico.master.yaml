@@ -83,10 +83,17 @@
       pause:
         seconds: 60
 
-    - name: Установка Nginx Ingress Controller
-      shell: |
-        kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
+    - name: Информация о следующих шагах
+      debug:
+        msg: |
+          Установка K3s с Calico завершена.
+          Для применения Docker registry секретов запустите:
+          ansible-playbook -i inventories/inventory.yml playbooks/k3s-calico-docker-patch.yaml
 
-    - name: Установка Cert Manager
-      shell: |
-        kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.3/cert-manager.yaml
+    # - name: Установка Nginx Ingress Controller
+    #   shell: |
+    #     kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
+
+    # - name: Установка Cert Manager
+    #   shell: |
+    #     kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.3/cert-manager.yaml
